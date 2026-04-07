@@ -1,0 +1,29 @@
+
+=================================================================
+                    YAMMDA DATASET ANALYSIS SUMMARY
+=================================================================
+
+Total Events Analyzed: 47,790,449
+
+Event Distribution:
+  - Listen:      46,467,212 (97.23%)
+  - Like:           881,456 ( 1.84%)
+  - Unlike:         312,972 ( 0.65%)
+  - Dislike:        107,776 ( 0.23%)
+  - Undislike:       21,033 ( 0.04%)
+
+Regret Behavior Metrics:
+  - Positive Regret Rate: 26.20%
+    (Unlike / (Like + Unlike))
+  
+  - Negative Regret Rate: 16.33%
+    (Undislike / (Dislike + Undislike))
+  
+  - Implicit Regret Rate: 30.47%
+    (Listen events with <20% played)
+
+Output Files:
+  - event_distribution.pdf
+  - regret_analysis.pdf
+
+=================================================================
