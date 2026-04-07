@@ -1,0 +1,53 @@
+
+# data files
+# large data folders
+# model files
+# python cache
+# system / platform
+# training outputs
+*.bin
+*.ckpt
+*.csv
+*.db
+*.h5
+*.hdf5
+*.npy
+*.npz
+*.parquet
+*.pt
+*.pth
+*.pyc
+*.pyo
+*.safetensors
+*.tsv
+.DS_Store
+.autodl/
+0330Yambda/data/embeddings.npz
+0330Yambda/data/embeddings.parquet
+0330Yambda/data/item_tokens.json
+0330Yambda/data/sequential-50m/listens.parquet
+0330Yambda/data/sequential-50m/multi_event.parquet
+__pycache__/
+checkpoints/
+data/
+data/HSRL/HSRL/dataset/ml1m/train.tsv
+data/HSRL/dataset/processed/item_meta.tsv
+data/HSRL/dataset/processed/test_data.tsv
+data/HSRL/dataset/processed/train_data.tsv
+data/HSRL/dataset/processed/train_data_500k.tsv
+data/HSRL/dataset/processed/val_data.tsv
+data/HSRL/dataset/rl4rs/rl4rs-dataset.tar.gz
+data/HSRL/dataset/rl4rs/rl4rs-dataset/rl4rs_dataset_a_rl.csv
+data/HSRL/dataset/rl4rs/rl4rs-dataset/rl4rs_dataset_a_sl.csv
+data/HSRL/dataset/rl4rs/rl4rs-dataset/rl4rs_dataset_b_rl.csv
+data/HSRL/dataset/rl4rs/rl4rs-dataset/rl4rs_dataset_b_sl.csv
+data/HSRL/dataset/rl4rs/rl4rs_dataset_new.tar.gz
+data/HSRL/dataset/rl4rs_processed/test.csv
+data/HSRL/dataset/rl4rs_processed/train.csv
+data/HSRL/dataset/rl4rs_processed/val.csv
+dataset/
+datasets/
+logs/
+output/
+outputs/
+wandb/

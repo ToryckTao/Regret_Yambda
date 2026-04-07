@@ -1,0 +1,101 @@
+{
+  "n_items": 100000,
+  "reconstruction": {
+    "mse": 0.0009401932475157082,
+    "cosine_sim_mean": 0.9381941556930542,
+    "cosine_sim_std": 0.030001740902662277,
+    "cosine_sim_p90": 0.9696192741394043,
+    "cosine_sim_p50": 0.9445926547050476,
+    "cosine_sim_p10": 0.8982903957366943,
+    "pearson_r": 0.9378455281257629
+  },
+  "token_distribution": {
+    "unique_4tuples": 98271,
+    "total_items": 100000,
+    "tuple_collision_rate": 0.017290000000000028,
+    "tuple_gini": 0.017157715704531284,
+    "avg_unique_per_level": 248.0,
+    "cross_level_corr": [
+      [
+        0.9999999999999998,
+        0.0049434764064039015,
+        0.011605053223020249,
+        -0.001140222312978053
+      ],
+      [
+        0.0049434764064039015,
+        0.9999999999999998,
+        0.005723312658729161,
+        -0.0013431964706435233
+      ],
+      [
+        0.011605053223020249,
+        0.005723312658729161,
+        1.0,
+        0.0012955091471806258
+      ],
+      [
+        -0.001140222312978053,
+        -0.0013431964706435233,
+        0.0012955091471806258,
+        0.9999999999999998
+      ]
+    ],
+    "per_level": {
+      "level_0": {
+        "active_codes": 256,
+        "utilization": 1.0,
+        "entropy": 7.927645713018726,
+        "norm_entropy": 0.9909557141273407,
+        "gini": 0.17105312500000003,
+        "freq_top1": 0.01074
+      },
+      "level_1": {
+        "active_codes": 255,
+        "utilization": 0.99609375,
+        "entropy": 7.951579188732417,
+        "norm_entropy": 0.9939473985915521,
+        "gini": 0.12025890624999991,
+        "freq_top1": 0.01091
+      },
+      "level_2": {
+        "active_codes": 250,
+        "utilization": 0.9765625,
+        "entropy": 7.934181705085888,
+        "norm_entropy": 0.991772713135736,
+        "gini": 0.11931874999999992,
+        "freq_top1": 0.01234
+      },
+      "level_3": {
+        "active_codes": 231,
+        "utilization": 0.90234375,
+        "entropy": 7.844399546661938,
+        "norm_entropy": 0.9805499433327423,
+        "gini": 0.14816906250000006,
+        "freq_top1": 0.00653
+      }
+    }
+  },
+  "codebook_utilization": {
+    "global_active_codes": 256,
+    "global_utilization": 1.0,
+    "global_entropy": 7.9836104629935525,
+    "global_norm_entropy": 0.9979513078741941,
+    "max_item_share": 37,
+    "top10_item_fraction": 0.11729
+  },
+  "nn_recall": {
+    "nn_recall": 0.1743133066578417,
+    "spearman_r": 0.08768538077322259,
+    "mrr": 0.0002000000000000016,
+    "nn_k": 20,
+    "nn_sample_size": 5000
+  },
+  "clustering": {
+    "n_clusters": 128,
+    "silhouette_emb": 0.10800717771053314,
+    "silhouette_tok": 0.0173799991607666,
+    "nmi_emb_tok": 0.5916174314269937
+  },
+  "eval_time_seconds": 150.7
+}
