@@ -16,12 +16,13 @@ CONFIG_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 export YAMBA_WORK_DIR="${YAMBA_WORK_DIR:-${CONFIG_DIR}}"
 export HSRL_ROOT="${HSRL_ROOT:-${YAMBA_WORK_DIR}/hsrl_core}"
-export YAMBA_DATA_DIR="${YAMBA_DATA_DIR:-/Users/Toryck/Coding/DATASET/Yambda}"
+export YAMBA_DATA_DIR="${YAMBA_DATA_DIR:-${YAMBA_WORK_DIR}/../0330Yambda/data}"
 export EMBEDDINGS_PARQUET="${EMBEDDINGS_PARQUET:-${YAMBA_DATA_DIR}/embeddings.parquet}"
-export MULTI_EVENT_PARQUET="${MULTI_EVENT_PARQUET:-${YAMBA_DATA_DIR}/sequential/50m/multi_event.parquet}"
+export MULTI_EVENT_PARQUET="${MULTI_EVENT_PARQUET:-${YAMBA_DATA_DIR}/sequential-50m/multi_event.parquet}"
 
 export PYTHON_BIN="${PYTHON_BIN:-python3}"
 export MPLCONFIGDIR="${MPLCONFIGDIR:-/tmp}"
+export OMP_NUM_THREADS="${OMP_NUM_THREADS:-1}"
 export DEVICE="${DEVICE:-cuda}"
 export CODEBOOK_DEVICE="${CODEBOOK_DEVICE:-cuda}"
 export EMBEDDING_BATCH_SIZE="${EMBEDDING_BATCH_SIZE:-4096}"
@@ -34,6 +35,12 @@ export CODEBOOK_SAMPLE_SIZE="${CODEBOOK_SAMPLE_SIZE:-200000}"
 export CODEBOOK_MAX_ITER="${CODEBOOK_MAX_ITER:-30}"
 export CODEBOOK_NPZ="${CODEBOOK_NPZ:-artifacts/codebook/yambda_rq_codebook.npz}"
 export CODEBOOK_META="${CODEBOOK_META:-artifacts/codebook/yambda_rq_codebook.meta.json}"
+
+# RQVAE 模式：替代 RQKMeans，提供 checkpoint 则 Stage 02 走 RQVAE 编码。
+# 推荐 checkpoint: /root/autodl-tmp/0330Yambda/pure_rqvae/checkpoints/Mar-30-2026_23-12-08/best_entropy_e20.pth
+#   - best_entropy_e20: entropy loss 优先，碰撞率最低（3.88%），全 256 码字激活
+#   - best_recon_e20:   重构 loss 优先，MSE 更低
+export RQVAE_CKPT="${RQVAE_CKPT:-/root/autodl-tmp/0330Yambda/pure_rqvae/checkpoints/Mar-30-2026_23-12-08/best_entropy_e20.pth}"
 
 export OUTPUT_PREFIX="${OUTPUT_PREFIX:-yambda}"
 export ORIG2DENSE_NPY="${ORIG2DENSE_NPY:-artifacts/mappings/yambda_orig2dense_item_id.npy}"
@@ -50,6 +57,9 @@ export TRAIN_TSV="${TRAIN_TSV:-artifacts/processed/train.tsv}"
 export VAL_TSV="${VAL_TSV:-artifacts/processed/val.tsv}"
 export TEST_TSV="${TEST_TSV:-artifacts/processed/test.tsv}"
 export SPLIT_META="${SPLIT_META:-artifacts/processed/split.meta.json}"
+export SPLIT_CHECKPOINT="${SPLIT_CHECKPOINT:-artifacts/processed/split.checkpoint.json}"
+export SPLIT_CHECKPOINT_EVERY="${SPLIT_CHECKPOINT_EVERY:-500}"
+export SPLIT_RESUME_ARG="${SPLIT_RESUME_ARG:-}"
 
 # HPN warm-start：MAX_*_ROWS=0 表示读取全量 split。
 export HPN_CHECKPOINT="${HPN_CHECKPOINT:-artifacts/models/hpn_warmstart.pt}"

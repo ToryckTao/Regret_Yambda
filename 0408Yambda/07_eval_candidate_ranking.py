@@ -29,6 +29,7 @@ import pandas as pd
 import pyarrow.parquet as pq
 import torch
 from torch.utils.data import DataLoader, Dataset
+from tqdm import tqdm
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -347,7 +348,8 @@ def evaluate(
     full_correct = 0
 
     with torch.no_grad():
-        for batch in loader:
+        pbar = tqdm(loader, desc="[eval]", ncols=80)
+        for batch in pbar:
             history_features = batch["history_features"].to(device)
             candidate_sid = batch["candidate_sid"].to(device)
             target_sid = batch["target_sid"].to(device)
@@ -377,6 +379,8 @@ def evaluate(
                 token_correct[level] += int(correct.sum().item())
                 full_mask &= correct
             full_correct += int(full_mask.sum().item())
+            pbar.set_postfix_str(f"n={n:,} mr={mean_rank_sum/max(n,1):.1f} mrr={mrr_sum/max(n,1):.4f}", refresh=True)
+        pbar.close()
 
     metrics: dict[str, float] = {
         "n_eval": float(n),

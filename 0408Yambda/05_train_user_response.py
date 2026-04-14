@@ -29,6 +29,7 @@ import pandas as pd
 import pyarrow.parquet as pq
 import torch
 from torch.utils.data import DataLoader, Dataset
+from tqdm import tqdm
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -475,7 +476,8 @@ def main() -> None:
     for epo in range(1, args.epoch + 1):
         model.train()
         epoch_losses = []
-        for step_idx, batch_data in enumerate(train_loader, start=1):
+        pbar = tqdm(train_loader, desc=f"[epoch {epo}] train", ncols=80)
+        for step_idx, batch_data in enumerate(pbar, start=1):
             optimizer.zero_grad()
             wrapped_batch = utils.wrap_batch(batch_data, device=str(device))
             out_dict = model.do_forward_and_loss(wrapped_batch)
@@ -484,15 +486,8 @@ def main() -> None:
             optimizer.step()
             epoch_losses.append(float(loss.item()))
 
-            if step_idx == 1:
-                print(
-                    f"[batch-shape] history={tuple(wrapped_batch['history'].shape)} "
-                    f"history_features={tuple(wrapped_batch['history_features'].shape)} "
-                    f"exposure_features={tuple(wrapped_batch['exposure_features'].shape)} "
-                    f"feedback={tuple(wrapped_batch['feedback'].shape)}"
-                )
-            if step_idx % 50 == 0:
-                print(f"[train] epoch={epo} step={step_idx} loss={np.mean(epoch_losses[-50:]):.6f}")
+            pbar.set_postfix_str(f"loss={np.mean(epoch_losses[-50:]):.6f}", refresh=True)
+        pbar.close()
 
         val_mse = evaluate_mse(model, val_loader, device)
         train_loss = float(np.mean(epoch_losses)) if epoch_losses else 0.0

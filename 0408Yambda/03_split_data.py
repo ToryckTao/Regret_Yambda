@@ -32,10 +32,11 @@ import json
 import os
 from collections import Counter
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable
 
 import numpy as np
 import pyarrow.parquet as pq
+from tqdm import tqdm
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -165,6 +166,23 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default=str(PROJECT_ROOT / "artifacts/processed/split.meta.json"),
         help="切分元信息输出路径",
+    )
+    parser.add_argument(
+        "--checkpoint",
+        type=str,
+        default=str(PROJECT_ROOT / "artifacts/processed/split.checkpoint.json"),
+        help="断点文件路径，记录已处理进度（用于 --resume）",
+    )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="从 checkpoint 断点继续执行（追加到现有 TSV）",
+    )
+    parser.add_argument(
+        "--checkpoint_every",
+        type=int,
+        default=500,
+        help="每处理多少个用户写一次 checkpoint",
     )
     return parser.parse_args()
 
@@ -461,10 +479,63 @@ def main() -> None:
     val_path = Path(args.output_val_tsv)
     test_path = Path(args.output_test_tsv)
     meta_path = Path(args.output_meta)
-    for p in [train_path, val_path, test_path, meta_path]:
-        p.parent.mkdir(parents=True, exist_ok=True)
+    ckpt_path = Path(args.checkpoint)
+    for p in [train_path.parent, val_path.parent, test_path.parent, meta_path.parent]:
+        p.mkdir(parents=True, exist_ok=True)
 
     orig2dense = np.load(orig2dense_path, mmap_mode="r")
+
+    # ── checkpoint / resume 逻辑 ──────────────────────────────────────────────
+    is_resume = args.resume and ckpt_path.exists()
+    if is_resume:
+        ckpt = json.loads(ckpt_path.read_text(encoding="utf-8"))
+        resume_uid = ckpt["last_uid"]
+        resume_seq_id = ckpt["next_sequence_id"]
+        resume_train_rows = ckpt["train_rows"]
+        resume_val_rows = ckpt["val_rows"]
+        resume_test_rows = ckpt["test_rows"]
+        resume_total_users = ckpt["users_processed"]
+        resume_missing = ckpt["missing_mapping"]
+        # 追加写入 TSV
+        train_mode = "a"
+        val_mode = "a"
+        test_mode = "a"
+        print(f"[resume] from checkpoint uid={resume_uid}, seq_id={resume_seq_id}, "
+              f"train_rows={resume_train_rows:,}, users={resume_total_users:,}")
+        # 跳过 parquet 中已处理过的用户
+        def iter_user_rows_filtered(parquet_path: Path, batch_size: int = 32, skip_until_uid: int = 0):
+            pf = pq.ParquetFile(parquet_path)
+            columns = [
+                "uid",
+                "timestamp",
+                "item_id",
+                "is_organic",
+                "played_ratio_pct",
+                "track_length_seconds",
+                "event_type",
+            ]
+            for batch in pf.iter_batches(batch_size=batch_size, columns=columns):
+                pyd = batch.to_pydict()
+                n_user = len(pyd["uid"])
+                for i in range(n_user):
+                    uid_val = int(pyd["uid"][i])
+                    if uid_val <= skip_until_uid:
+                        continue
+                    yield {k: pyd[k][i] for k in columns}
+        user_iterator = iter_user_rows_filtered(parquet_path, skip_until_uid=resume_uid)
+    else:
+        resume_uid = 0
+        resume_seq_id = 1
+        resume_train_rows = 0
+        resume_val_rows = 0
+        resume_test_rows = 0
+        resume_total_users = 0
+        resume_missing = 0
+        train_mode = "w"
+        val_mode = "w"
+        test_mode = "w"
+        user_iterator = iter_user_rows(parquet_path)
+
     columns = [
         "sequence_id",
         "user_id",
@@ -482,27 +553,30 @@ def main() -> None:
         "user_like_history",
     ]
 
-    total_users = 0
+    total_users = resume_total_users
     total_raw_events = 0
     total_kept_events = 0
-    total_missing_mapping = 0
-    split_counts = {"train": 0, "val": 0, "test": 0}
-    next_sequence_id = 1
+    total_missing_mapping = resume_missing
+    split_counts = {"train": resume_train_rows, "val": resume_val_rows, "test": resume_test_rows}
+    next_sequence_id = resume_seq_id
 
-    train_f = train_path.open("w", encoding="utf-8", newline="")
-    val_f = val_path.open("w", encoding="utf-8", newline="")
-    test_f = test_path.open("w", encoding="utf-8", newline="")
+    train_f = train_path.open(train_mode, encoding="utf-8", newline="")
+    val_f = val_path.open(val_mode, encoding="utf-8", newline="")
+    test_f = test_path.open(test_mode, encoding="utf-8", newline="")
     try:
         writers = {
             "train": csv.DictWriter(train_f, fieldnames=columns, delimiter="\t"),
             "val": csv.DictWriter(val_f, fieldnames=columns, delimiter="\t"),
             "test": csv.DictWriter(test_f, fieldnames=columns, delimiter="\t"),
         }
-        for writer in writers.values():
-            writer.writeheader()
+        if not is_resume:
+            for writer in writers.values():
+                writer.writeheader()
 
-        for row in iter_user_rows(parquet_path):
+        total_users_pbar = tqdm(unit="users", desc="[split]", ncols=80)
+        for row in user_iterator:
             total_users += 1
+            total_users_pbar.update(1)
             if args.max_users and total_users > args.max_users:
                 break
 
@@ -512,6 +586,11 @@ def main() -> None:
             total_missing_mapping += stats["skipped_missing_mapping"]
 
             if not events:
+                total_users_pbar.set_postfix_str(
+                    f"train={split_counts['train']:,} val={split_counts['val']:,} "
+                    f"test={split_counts['test']:,} missing={total_missing_mapping:,}",
+                    refresh=True
+                )
                 continue
 
             for ev in events:
@@ -523,6 +602,11 @@ def main() -> None:
                 anchor_policy=args.anchor_policy,
             )
             if not episodes:
+                total_users_pbar.set_postfix_str(
+                    f"train={split_counts['train']:,} val={split_counts['val']:,} "
+                    f"test={split_counts['test']:,} missing={total_missing_mapping:,}",
+                    refresh=True
+                )
                 continue
 
             split_plan = assign_user_splits(len(episodes))
@@ -550,16 +634,34 @@ def main() -> None:
                 split_counts[split_name] += 1
                 next_sequence_id += 1
 
-            if total_users % 200 == 0:
-                print(
-                    f"[progress] users={total_users:,}, train={split_counts['train']:,}, "
-                    f"val={split_counts['val']:,}, test={split_counts['test']:,}, "
-                    f"missing_mapping={total_missing_mapping:,}"
-                )
+            total_users_pbar.set_postfix_str(
+                f"train={split_counts['train']:,} val={split_counts['val']:,} "
+                f"test={split_counts['test']:,} missing={total_missing_mapping:,}",
+                refresh=True
+            )
+
+            # 每 checkpoint_every 用户写一次 checkpoint
+            if total_users % args.checkpoint_every == 0:
+                ckpt_data = {
+                    "last_uid": int(row["uid"]),
+                    "next_sequence_id": next_sequence_id,
+                    "train_rows": split_counts["train"],
+                    "val_rows": split_counts["val"],
+                    "test_rows": split_counts["test"],
+                    "users_processed": total_users,
+                    "missing_mapping": total_missing_mapping,
+                }
+                ckpt_path.write_text(json.dumps(ckpt_data, indent=2), encoding="utf-8")
+                train_f.flush(); val_f.flush(); test_f.flush()
+
+        total_users_pbar.close()
     finally:
         train_f.close()
         val_f.close()
         test_f.close()
+        # 清理 checkpoint
+        if ckpt_path.exists():
+            ckpt_path.unlink()
 
     meta = {
         "multi_event_parquet": str(parquet_path),

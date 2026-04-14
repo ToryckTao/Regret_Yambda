@@ -30,10 +30,18 @@ import pyarrow.parquet as pq
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
+from tqdm import tqdm
+
+try:
+    import wandb
+    _WANDB_AVAILABLE = True
+except ImportError:
+    _WANDB_AVAILABLE = False
+    wandb = None
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
-DEFAULT_YAMBA_DATA_DIR = Path(os.environ.get("YAMBA_DATA_DIR", "/Users/Toryck/Coding/DATASET/Yambda"))
+DEFAULT_YAMBA_DATA_DIR = Path(os.environ.get("YAMBA_DATA_DIR", str(PROJECT_ROOT / "../0330Yambda/data")))
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -205,6 +213,29 @@ def parse_args() -> argparse.Namespace:
         default=str(PROJECT_ROOT / "artifacts/models/hpn_warmstart.meta.json"),
         help="训练元信息保存路径",
     )
+    parser.add_argument(
+        "--wandb",
+        action="store_true",
+        help="启用 wandb 日志记录",
+    )
+    parser.add_argument(
+        "--wandb_project",
+        type=str,
+        default="yambda-hpn",
+        help="wandb 项目名称",
+    )
+    parser.add_argument(
+        "--wandb_entity",
+        type=str,
+        default=None,
+        help="wandb entity/用户名",
+    )
+    parser.add_argument(
+        "--wandb_run_name",
+        type=str,
+        default=None,
+        help="wandb run 名称，默认为 None（自动生成）",
+    )
     return parser.parse_args()
 
 
@@ -238,27 +269,71 @@ def parse_list_cell(cell: object) -> list[int]:
 
 
 def load_split_df(path: Path, max_rows: int) -> pd.DataFrame:
-    """输入：split TSV 路径。输出：DataFrame。"""
+    """
+    输入：split TSV 路径。输出：DataFrame。
+    指定 dtype 以避免 pandas 自动推断包含列表字符串的列时失败。
+    """
     nrows = None if max_rows <= 0 else max_rows
-    return pd.read_table(path, sep="\t", engine="python", nrows=nrows)
+    dtype = {
+        "sequence_id": np.int64,
+        "user_id": np.int64,
+        "anchor_time": np.int64,
+        "anchor_event_type": str,
+        "target_orig_item_id": np.int64,
+        "target_dense_item_id": np.int64,
+        "slate_of_items": str,
+        "feedback_label": np.float64,
+        "user_clicks": np.float64,
+        "user_mid_history": str,
+        "user_click_history": str,
+        "next_user_mid_history": str,
+        "next_user_click_history": str,
+        "user_like_history": str,
+    }
+    return pd.read_table(path, sep="\t", engine="python", nrows=nrows, dtype=dtype)
 
 
 def collect_needed_dense_ids(df: pd.DataFrame) -> set[int]:
     """
     输入：split DataFrame
     输出：该数据集实际用到的 dense item id 集合
+
+    使用向量化操作代替 iterrows，大幅提升速度和降低内存占用。
     """
     needed: set[int] = set()
-    for _, row in df.iterrows():
-        target_dense = int(row["target_dense_item_id"])
-        if target_dense > 0:
-            needed.add(target_dense)
-        for iid in parse_list_cell(row["user_mid_history"]):
-            if iid > 0:
-                needed.add(iid)
-        for iid in parse_list_cell(row.get("next_user_mid_history", "[]")):
-            if iid > 0:
-                needed.add(iid)
+
+    # 向量化收集 target_dense_item_id（跳过无效值）
+    target_ids = df["target_dense_item_id"].values
+    target_ids = target_ids[target_ids > 0].astype(np.int64)
+    needed.update(target_ids.tolist())
+
+    # 向量化解析 user_mid_history 列
+    history_col = df["user_mid_history"]
+    for cell in history_col:
+        if isinstance(cell, str) and cell not in ("", "[]"):
+            try:
+                ids = ast.literal_eval(cell)
+                if isinstance(ids, list):
+                    for iid in ids:
+                        if iid > 0:
+                            needed.add(int(iid))
+            except (ValueError, SyntaxError):
+                pass
+
+    # 向量化解析 next_user_mid_history 列
+    if "next_user_mid_history" in df.columns:
+        next_history_col = df["next_user_mid_history"]
+        for cell in next_history_col:
+            if isinstance(cell, str) and cell not in ("", "[]"):
+                try:
+                    ids = ast.literal_eval(cell)
+                    if isinstance(ids, list):
+                        for iid in ids:
+                            if iid > 0:
+                                needed.add(int(iid))
+                except (ValueError, SyntaxError):
+                    pass
+
     return needed
 
 
@@ -435,6 +510,8 @@ def run_epoch(
     loader: DataLoader,
     device: torch.device,
     optimizer: torch.optim.Optimizer | None,
+    epoch: int = 0,
+    is_train: bool = True,
 ) -> dict[str, float]:
     """
     输入：
@@ -442,11 +519,12 @@ def run_epoch(
     - loader
     - device
     - optimizer: 为 None 时表示验证
+    - epoch: 当前 epoch 编号
+    - is_train: 是否为训练模式
 
     输出：
     - loss / token_acc / full_path_acc 等统计
     """
-    is_train = optimizer is not None
     model.train(is_train)
 
     total_loss = 0.0
@@ -455,15 +533,11 @@ def run_epoch(
     total_full_correct = 0
     sid_levels = model.sid_levels
 
-    for batch_idx, batch in enumerate(loader, start=1):
+    label = "train" if is_train else "val"
+    pbar = tqdm(loader, desc=f"[epoch {epoch}] {label}", ncols=80)
+    for batch_idx, batch in enumerate(pbar, start=1):
         history_features = batch["history_features"].to(device)
         target_sid = batch["target_sid"].to(device)
-
-        if batch_idx == 1:
-            print(
-                f"[batch-shape] history_features={tuple(history_features.shape)} "
-                f"target_sid={tuple(target_sid.shape)}"
-            )
 
         output = model({"history_features": history_features})
         sid_logits = output["sid_logits"]
@@ -499,6 +573,9 @@ def run_epoch(
             total_token_correct[l] += token_correct[l]
         total_full_correct += int(full_correct_mask.sum().item())
 
+        pbar.set_postfix_str(f"loss={loss.item():.4f} acc={total_full_correct/max(total_samples,1):.4f}", refresh=True)
+
+    pbar.close()
     token_acc = [
         (correct / total_samples) if total_samples > 0 else 0.0
         for correct in (total_token_correct or [0] * sid_levels)
@@ -522,6 +599,37 @@ def main() -> None:
     device = resolve_device(args.device)
     print(f"[device] using {device}")
     set_random_seed(args.seed)
+
+    # wandb 初始化
+    if args.wandb:
+        if not _WANDB_AVAILABLE:
+            print("[warning] wandb 未安装，跳过日志记录")
+        else:
+            wandb.init(
+                project=args.wandb_project,
+                entity=args.wandb_entity,
+                name=args.wandb_run_name,
+                config={
+                    "train_file": args.train_file,
+                    "val_file": args.val_file,
+                    "embeddings_parquet": args.embeddings_parquet,
+                    "embedding_column": args.embedding_column,
+                    "max_seq_len": args.max_seq_len,
+                    "batch_size": args.batch_size,
+                    "epochs": args.epochs,
+                    "lr": args.lr,
+                    "weight_decay": args.weight_decay,
+                    "sasrec_n_layer": args.sasrec_n_layer,
+                    "sasrec_d_model": args.sasrec_d_model,
+                    "sasrec_d_forward": args.sasrec_d_forward,
+                    "sasrec_n_head": args.sasrec_n_head,
+                    "sasrec_dropout": args.sasrec_dropout,
+                    "sid_temp": args.sid_temp,
+                    "device": str(device),
+                    "seed": args.seed,
+                },
+            )
+            print(f"[wandb] initialized: {wandb.run.name}")
 
     train_df = load_split_df(Path(args.train_file), args.max_train_rows)
     val_df = load_split_df(Path(args.val_file), args.max_val_rows)
@@ -599,15 +707,34 @@ def main() -> None:
     best_val_loss = float("inf")
     history = []
     for epoch in range(1, args.epochs + 1):
-        train_metrics = run_epoch(model, train_loader, device, optimizer)
+        train_metrics = run_epoch(model, train_loader, device, optimizer, epoch=epoch, is_train=True)
         with torch.no_grad():
-            val_metrics = run_epoch(model, val_loader, device, optimizer=None)
+            val_metrics = run_epoch(model, val_loader, device, optimizer=None, epoch=epoch, is_train=False)
         record = {
             "epoch": epoch,
             "train": train_metrics,
             "val": val_metrics,
         }
         history.append(record)
+
+        # wandb 记录
+        if args.wandb and _WANDB_AVAILABLE:
+            wandb.log({
+                "epoch": epoch,
+                "train/loss": train_metrics["loss"],
+                "train/full_path_acc": train_metrics["full_path_acc"],
+                "train/token_acc_l1": train_metrics.get("token_acc_l1", 0),
+                "train/token_acc_l2": train_metrics.get("token_acc_l2", 0),
+                "train/token_acc_l3": train_metrics.get("token_acc_l3", 0),
+                "train/token_acc_l4": train_metrics.get("token_acc_l4", 0),
+                "val/loss": val_metrics["loss"],
+                "val/full_path_acc": val_metrics["full_path_acc"],
+                "val/token_acc_l1": val_metrics.get("token_acc_l1", 0),
+                "val/token_acc_l2": val_metrics.get("token_acc_l2", 0),
+                "val/token_acc_l3": val_metrics.get("token_acc_l3", 0),
+                "val/token_acc_l4": val_metrics.get("token_acc_l4", 0),
+            }, step=epoch)
+
         print(
             f"[epoch {epoch}] "
             f"train_loss={train_metrics['loss']:.6f} "
@@ -655,6 +782,10 @@ def main() -> None:
     }
     save_meta.write_text(json.dumps(meta, indent=2), encoding="utf-8")
     print(f"[done] training meta saved to {save_meta}")
+
+    if args.wandb and _WANDB_AVAILABLE:
+        wandb.finish()
+        print("[wandb] run finished")
 
 
 if __name__ == "__main__":

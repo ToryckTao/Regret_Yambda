@@ -74,17 +74,22 @@ class BaseRLAgent:
         t = time.time()
         start_time = t
         print("Training:")
-        for i in tqdm(range(step_offset, step_offset + self.n_iter[-1])):
+        pbar = tqdm(total=step_offset + self.n_iter[-1], desc="[DDPG]", ncols=80, initial=step_offset)
+        for i in range(step_offset, step_offset + self.n_iter[-1]):
             observation = self.run_episode_step(i, self.exploration_scheduler.value(i), observation, True)
             if i % self.train_every_n_step == 0:
                 self.step_train()
             if i % self.check_episode == 0:
                 t_now = time.time()
+                pbar.set_postfix_str(self._make_short_report(i), refresh=False)
                 print(f"Episode step {i}, time diff {t_now - t}, total time dif {t - start_time})")
                 print(self.log_iteration(i))
                 t = t_now
                 if i % (3 * self.check_episode) == 0:
                     self.save()
+            pbar.update(1)
+            pbar.set_postfix_str(self._make_short_report(i), refresh=False)
+        pbar.close()
         self.action_after_train()
 
     def action_before_train(self):
@@ -108,6 +113,21 @@ class BaseRLAgent:
         episode_report = self.facade.get_episode_report(10)
         train_report = {key: np.mean(value[-10:]) for key, value in self.training_history.items()}
         return episode_report, train_report
+
+    def _make_short_report(self, step: int) -> str:
+        """构造 tqdm postfix 短报告。"""
+        if not self.training_history:
+            return ""
+        parts = []
+        for key in ["actor_loss", "critic_loss"]:
+            if key in self.training_history and self.training_history[key]:
+                parts.append(f"{key}={self.training_history[key][-1]:.4f}")
+        episode_report, _ = self.get_report()
+        if "average_total_reward" in episode_report:
+            parts.append(f"reward={episode_report['average_total_reward']:.3f}")
+        if "average_n_step" in episode_report:
+            parts.append(f"step={episode_report['average_n_step']:.1f}")
+        return " ".join(parts)
 
     def log_iteration(self, step):
         episode_report, train_report = self.get_report()

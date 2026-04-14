@@ -29,8 +29,12 @@ from pathlib import Path
 from typing import Iterable
 
 import numpy as np
-import pyarrow.compute as pc
 import pyarrow.parquet as pq
+import torch
+import torch.nn.functional as F
+from tqdm import tqdm
+
+from RQVAE.encoder import load_rqvae_encoder
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -50,7 +54,13 @@ def parse_args() -> argparse.Namespace:
         "--codebook_npz",
         type=str,
         default=str(PROJECT_ROOT / "artifacts/codebook/yambda_rq_codebook.npz"),
-        help="Codebook file produced by 01_build_codebook.py",
+        help="Codebook file produced by 01_build_codebook.py (RQKMeans npz or RQVAE .pth)",
+    )
+    parser.add_argument(
+        "--rqvae_ckpt",
+        type=str,
+        default=None,
+        help="Path to RQVAE checkpoint (.pth). If provided, uses RQVAE encoder + codebooks instead of raw codebooks.",
     )
     parser.add_argument(
         "--embedding_column",
@@ -103,27 +113,6 @@ def load_codebooks(npz_path: Path) -> list[np.ndarray]:
     if cbs.ndim == 3:
         return [cbs[i].astype(np.float32) for i in range(cbs.shape[0])]
     return [np.asarray(cb, dtype=np.float32) for cb in cbs]
-
-
-def encode_sid(emb: np.ndarray, codebooks: list[np.ndarray]) -> tuple[int, ...]:
-    """
-    输入：
-      - emb: 单个 item 的连续向量，shape=(D,)
-      - codebooks: 多层 codebook
-    输出：
-      - 一个 SID 路径，例如 (4, 11, 2)
-    """
-    residual = emb.astype(np.float32).copy()
-    tokens: list[int] = []
-    for cb in codebooks:
-        xc = residual @ cb.T
-        x2 = float((residual * residual).sum())
-        c2 = (cb * cb).sum(axis=1)
-        d2 = x2 + c2 - 2.0 * xc
-        z_l = int(np.argmin(d2))
-        tokens.append(z_l)
-        residual = residual - cb[z_l]
-    return tuple(tokens)
 
 
 def encode_sid_batch(emb_batch: np.ndarray, codebooks: list[np.ndarray]) -> np.ndarray:
@@ -182,15 +171,28 @@ def scan_item_id_range(parquet_path: Path) -> tuple[int, int, int]:
       - min_item_id: 最小原始 item_id
       - max_item_id: 最大原始 item_id
     """
-    tbl = pq.read_table(parquet_path, columns=["item_id"])
-    col = tbl["item_id"]
-    num_rows = len(col)
-    min_item_id = int(pc.min(col).as_py())
-    max_item_id = int(pc.max(col).as_py())
-    distinct = int(pc.count_distinct(col).as_py())
-    if distinct != num_rows:
-        raise ValueError(f"Expected unique item_id per row, got distinct={distinct}, rows={num_rows}")
-    return num_rows, min_item_id, max_item_id
+    pf = pq.ParquetFile(parquet_path)
+    num_rows = pf.metadata.num_rows
+    min_item_id = None
+    max_item_id = None
+
+    for batch in pf.iter_batches(batch_size=100000, columns=["item_id"]):
+        pyd = batch.to_pydict()
+        ids = pyd["item_id"]
+        if min_item_id is None:
+            min_item_id = ids[0]
+            max_item_id = ids[0]
+        batch_min = min(ids)
+        batch_max = max(ids)
+        if batch_min < min_item_id:
+            min_item_id = batch_min
+        if batch_max > max_item_id:
+            max_item_id = batch_max
+
+    if min_item_id is None or max_item_id is None:
+        raise ValueError(f"Failed to scan item_id range from {parquet_path}")
+
+    return num_rows, int(min_item_id), int(max_item_id)
 
 
 def main() -> None:
@@ -200,12 +202,23 @@ def main() -> None:
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"[1/4] loading codebooks from {args.codebook_npz}")
-    codebooks = load_codebooks(Path(args.codebook_npz))
-    n_levels = len(codebooks)
-    vocab_sizes = [int(cb.shape[0]) for cb in codebooks]
-    emb_dim = int(codebooks[0].shape[1])
-    print(f"[codebook] levels={n_levels}, vocab_sizes={vocab_sizes}, dim={emb_dim}")
+    use_rqvae = args.rqvae_ckpt is not None
+    if use_rqvae:
+        print(f"[1/4] loading RQVAE checkpoint from {args.rqvae_ckpt}")
+        encoder = load_rqvae_encoder(args.rqvae_ckpt)
+        codebooks = encoder.codebooks
+        n_levels = encoder.n_levels
+        vocab_sizes = [encoder.codebook_size] * n_levels
+        emb_dim = int(encoder.enc_w0.shape[1])  # 128 (input dim)
+        print(f"[codebook] RQVAE mode: levels={n_levels}, vocab_sizes={vocab_sizes}, input_dim={emb_dim}")
+    else:
+        print(f"[1/4] loading codebooks from {args.codebook_npz}")
+        codebooks = load_codebooks(Path(args.codebook_npz))
+        n_levels = len(codebooks)
+        vocab_sizes = [int(cb.shape[0]) for cb in codebooks]
+        emb_dim = int(codebooks[0].shape[1])
+        print(f"[codebook] levels={n_levels}, vocab_sizes={vocab_sizes}, dim={emb_dim}")
+        encoder = None
 
     print(f"[2/4] scanning item_id range in {parquet_path}")
     num_rows, min_item_id, max_item_id = scan_item_id_range(parquet_path)
@@ -227,6 +240,7 @@ def main() -> None:
     prev_item_id = None
     monotonic_non_decreasing = True
 
+    pbar = tqdm(total=num_rows_effective, unit="items", desc="[encode]", ncols=80)
     for batch_idx, (item_ids, embeddings) in enumerate(
         iter_item_batches(parquet_path, args.embedding_column, args.batch_size),
         start=1,
@@ -259,7 +273,11 @@ def main() -> None:
             break
 
         emb_batch = np.stack(batch_embs, axis=0)
-        sid_batch = encode_sid_batch(emb_batch, codebooks)
+
+        if use_rqvae:
+            sid_batch = encoder.encode_numpy(emb_batch).astype(np.int32)
+        else:
+            sid_batch = encode_sid_batch(emb_batch, codebooks)
 
         start_dense = dense_id + 1
         end_dense = dense_id + len(batch_orig_ids)
@@ -269,12 +287,10 @@ def main() -> None:
         orig2dense[np.asarray(batch_orig_ids, dtype=np.int64)] = dense_ids
         dense_item2sid[start_dense:end_dense + 1] = sid_batch
         dense_id = end_dense
-
-        if batch_idx % 50 == 0 or dense_id == num_rows_effective:
-            print(f"[encode] processed {dense_id:,} / {num_rows_effective:,} items")
-
+        pbar.update(len(batch_orig_ids))
         if args.max_rows and dense_id >= num_rows_effective:
             break
+    pbar.close()
 
     if dense_id != num_rows_effective:
         raise RuntimeError(f"Expected {num_rows_effective} items, but encoded {dense_id}")
@@ -294,6 +310,8 @@ def main() -> None:
         "embeddings_parquet": str(parquet_path),
         "embedding_column": args.embedding_column,
         "codebook_npz": str(args.codebook_npz),
+        "rqvae_ckpt": str(args.rqvae_ckpt) if use_rqvae else None,
+        "encoding_mode": "rqvae" if use_rqvae else "rqkmeans",
         "num_rows_total": int(num_rows),
         "num_rows_effective": int(num_rows_effective),
         "min_item_id": int(min_item_id),

@@ -43,13 +43,21 @@ run_02_item_sid() {
   echo "[stage] 02_item_sid"
   need_file "${CODEBOOK_NPZ}" "请先运行 ./run_stage.sh 01"
   echo "[output] ${DENSE_ITEM2SID_NPY}"
+  if [[ -n "${RQVAE_CKPT:-}" ]]; then
+    echo "[mode] RQVAE encoding: ${RQVAE_CKPT}"
+    RQVAE_ARG="--rqvae_ckpt ${RQVAE_CKPT}"
+  else
+    echo "[mode] RQKMeans encoding"
+    RQVAE_ARG=""
+  fi
   MPLCONFIGDIR="${MPLCONFIGDIR}" "${PYTHON_BIN}" -u 02_build_item_sid.py \
     --embeddings_parquet "${EMBEDDINGS_PARQUET}" \
     --codebook_npz "${CODEBOOK_NPZ}" \
     --embedding_column "${EMBEDDING_COLUMN}" \
     --batch_size "${EMBEDDING_BATCH_SIZE}" \
     --output_dir artifacts/mappings \
-    --output_prefix "${OUTPUT_PREFIX}"
+    --output_prefix "${OUTPUT_PREFIX}" \
+    ${RQVAE_ARG}
 }
 
 run_03_split() {
@@ -70,7 +78,10 @@ run_03_split() {
     --output_train_tsv "${TRAIN_TSV}" \
     --output_val_tsv "${VAL_TSV}" \
     --output_test_tsv "${TEST_TSV}" \
-    --output_meta "${SPLIT_META}"
+    --output_meta "${SPLIT_META}" \
+    --checkpoint "${SPLIT_CHECKPOINT}" \
+    --checkpoint_every "${SPLIT_CHECKPOINT_EVERY}" \
+    "${SPLIT_RESUME_ARG:-}"
 }
 
 run_04_hpn() {
