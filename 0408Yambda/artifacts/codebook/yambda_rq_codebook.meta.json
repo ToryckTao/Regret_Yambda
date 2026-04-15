@@ -1,0 +1,23 @@
+{
+  "embeddings_parquet": "/root/autodl-tmp/0408Yambda/../0330Yambda/data/embeddings.parquet",
+  "embedding_column": "normalized_embed",
+  "sample_size_requested": 200000,
+  "sample_info": {
+    "rows_seen": 7721749,
+    "sample_size_effective": 200000,
+    "embedding_dim": 128
+  },
+  "sample_stats": {
+    "mean": -0.0025445749051868916,
+    "std": 0.08835171163082123,
+    "min": -0.43363627791404724,
+    "max": 0.39202889800071716,
+    "mean_l2_norm": 1.0
+  },
+  "n_levels_requested": 4,
+  "n_levels_trained": 4,
+  "codebook_size": 256,
+  "max_iter": 30,
+  "device_used": "cuda",
+  "output_npz": "artifacts/codebook/yambda_rq_codebook.npz"
+}

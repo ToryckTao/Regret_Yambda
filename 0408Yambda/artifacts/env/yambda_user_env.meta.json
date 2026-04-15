@@ -1,0 +1,59 @@
+{
+  "train_file": "artifacts/env/yambda_user_env.train.tsv",
+  "val_file": "artifacts/env/yambda_user_env.val.tsv",
+  "test_file": "artifacts/env/yambda_user_env.val.tsv",
+  "embeddings_parquet": "/root/autodl-tmp/0408Yambda/../0330Yambda/data/embeddings.parquet",
+  "orig2dense_npy": "artifacts/mappings/yambda_orig2dense_item_id.npy",
+  "embedding_column": "normalized_embed",
+  "feature_cache_npz": "artifacts/env/yambda_user_env.feature_cache.npz",
+  "effective_train_file": "artifacts/env/yambda_user_env.train.tsv",
+  "effective_val_file": "artifacts/env/yambda_user_env.val.tsv",
+  "model_path": "artifacts/env/yambda_user_env.model",
+  "log_path": "artifacts/env/log/yambda_user_env.model.log",
+  "reader": "YambdaFeatureCacheReader",
+  "model": "YambdaUserResponse",
+  "device": "cuda",
+  "batch_size": 256,
+  "lr": 0.0001,
+  "epoch": 5,
+  "max_seq_len": 50,
+  "max_train_rows": 0,
+  "max_val_rows": 0,
+  "train_sample_size": 0,
+  "val_sample_size": 0,
+  "cache_stats": {
+    "needed": 144482,
+    "cached": 144482,
+    "missing": 0
+  },
+  "train_samples": 500000,
+  "val_samples": 9999,
+  "best_val_mse": 0.22173665671220288,
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 0.22391587228513302,
+      "val_mse": 0.22173665671220288
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.19715251398397687,
+      "val_mse": 0.22265542056610826
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.19427396254108775,
+      "val_mse": 0.22922500346538865
+    },
+    {
+      "epoch": 4,
+      "train_loss": 0.19240045112042004,
+      "val_mse": 0.2295704051272513
+    },
+    {
+      "epoch": 5,
+      "train_loss": 0.19075821494891432,
+      "val_mse": 0.23031535767617137
+    }
+  ]
+}

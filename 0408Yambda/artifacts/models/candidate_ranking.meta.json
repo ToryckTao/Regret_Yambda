@@ -1,0 +1,33 @@
+{
+  "eval_file": "artifacts/processed/test.tsv",
+  "actor_checkpoint": "artifacts/models/yambda_sid_actor",
+  "actor_loaded": true,
+  "num_negatives": 99,
+  "candidate_size": 100,
+  "max_eval_rows": 0,
+  "sid_levels": 4,
+  "sid_vocab_size": 256,
+  "cache_stats": {
+    "needed": 112819,
+    "cached": 112819,
+    "missing": 0
+  },
+  "metrics": {
+    "n_eval": 9999.0,
+    "mean_rank": 5.2797279727972795,
+    "mrr": 0.6472293961726495,
+    "full_path_acc": 0.0025002500250025004,
+    "token_acc_l1": 0.2569256925692569,
+    "token_acc_l2": 0.08380838083808381,
+    "token_acc_l3": 0.05140514051405141,
+    "token_acc_l4": 0.029102910291029103,
+    "hr@1": 0.51995199519952,
+    "ndcg@1": 0.51995199519952,
+    "hr@5": 0.8051805180518051,
+    "ndcg@5": 0.6746745435270456,
+    "hr@10": 0.8825882588258825,
+    "ndcg@10": 0.6999049565829996,
+    "hr@20": 0.938993899389939,
+    "ndcg@20": 0.7142145234306451
+  }
+}

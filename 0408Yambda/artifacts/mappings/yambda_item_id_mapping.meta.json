@@ -1,0 +1,25 @@
+{
+  "embeddings_parquet": "/root/autodl-tmp/0408Yambda/../0330Yambda/data/embeddings.parquet",
+  "embedding_column": "normalized_embed",
+  "codebook_npz": "artifacts/codebook/yambda_rq_codebook.npz",
+  "rqvae_ckpt": "/root/autodl-tmp/0330Yambda/pure_rqvae/checkpoints/Mar-30-2026_23-12-08/best_entropy_e20.pth",
+  "encoding_mode": "rqvae",
+  "num_rows_total": 7721749,
+  "num_rows_effective": 7721749,
+  "min_item_id": 2,
+  "max_item_id": 9390623,
+  "monotonic_non_decreasing_item_ids": true,
+  "n_levels": 4,
+  "vocab_sizes": [
+    256,
+    256,
+    256,
+    256
+  ],
+  "embedding_dim": 128,
+  "outputs": {
+    "dense_item2sid_npy": "artifacts/mappings/yambda_dense_item2sid.npy",
+    "dense2orig_item_id_npy": "artifacts/mappings/yambda_dense2orig_item_id.npy",
+    "orig2dense_item_id_npy": "artifacts/mappings/yambda_orig2dense_item_id.npy"
+  }
+}

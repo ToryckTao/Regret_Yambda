@@ -1,0 +1,92 @@
+{
+  "train_file": "/root/autodl-tmp/0408Yambda/artifacts/processed/train.tsv",
+  "val_file": "/root/autodl-tmp/0408Yambda/artifacts/processed/val.tsv",
+  "embeddings_parquet": "/root/autodl-tmp/0408Yambda/../0330Yambda/data/embeddings.parquet",
+  "orig2dense_npy": "/root/autodl-tmp/0408Yambda/artifacts/mappings/yambda_orig2dense_item_id.npy",
+  "dense_item2sid_npy": "/root/autodl-tmp/0408Yambda/artifacts/mappings/yambda_dense_item2sid.npy",
+  "embedding_column": "normalized_embed",
+  "max_seq_len": 50,
+  "train_positive_only": false,
+  "min_train_reward": -1000000000.0,
+  "batch_size": 256,
+  "epochs": 3,
+  "lr": 0.001,
+  "weight_decay": 1e-05,
+  "device": "cuda",
+  "sid_levels": 4,
+  "sid_vocab_size": 256,
+  "cache_stats": {
+    "needed": 122052,
+    "cached": 122052,
+    "missing": 0
+  },
+  "train_samples": 100000,
+  "val_samples": 9999,
+  "best_val_loss": 4.741795810297353,
+  "history": [
+    {
+      "epoch": 1,
+      "train": {
+        "loss": 4.7423297747802735,
+        "full_path_acc": 0.00387,
+        "token_acc_l1": 0.2079,
+        "token_acc_l2": 0.07977,
+        "token_acc_l3": 0.03556,
+        "token_acc_l4": 0.02783,
+        "n_sample": 100000.0
+      },
+      "val": {
+        "loss": 4.8472447215062235,
+        "full_path_acc": 0.00020002000200020003,
+        "token_acc_l1": 0.16011601160116012,
+        "token_acc_l2": 0.0442044204420442,
+        "token_acc_l3": 0.029302930293029304,
+        "token_acc_l4": 0.022702270227022703,
+        "n_sample": 9999.0
+      }
+    },
+    {
+      "epoch": 2,
+      "train": {
+        "loss": 4.509449550628662,
+        "full_path_acc": 0.00471,
+        "token_acc_l1": 0.2605,
+        "token_acc_l2": 0.09694,
+        "token_acc_l3": 0.04252,
+        "token_acc_l4": 0.03339,
+        "n_sample": 100000.0
+      },
+      "val": {
+        "loss": 4.777313730718851,
+        "full_path_acc": 0.00010001000100010001,
+        "token_acc_l1": 0.18931893189318932,
+        "token_acc_l2": 0.052405240524052404,
+        "token_acc_l3": 0.034103410341034104,
+        "token_acc_l4": 0.020002000200020003,
+        "n_sample": 9999.0
+      }
+    },
+    {
+      "epoch": 3,
+      "train": {
+        "loss": 4.4514489530944825,
+        "full_path_acc": 0.00467,
+        "token_acc_l1": 0.27395,
+        "token_acc_l2": 0.10012,
+        "token_acc_l3": 0.04358,
+        "token_acc_l4": 0.03523,
+        "n_sample": 100000.0
+      },
+      "val": {
+        "loss": 4.741795810297353,
+        "full_path_acc": 0.00020002000200020003,
+        "token_acc_l1": 0.19401940194019401,
+        "token_acc_l2": 0.0555055505550555,
+        "token_acc_l3": 0.03660366036603661,
+        "token_acc_l4": 0.022002200220022004,
+        "n_sample": 9999.0
+      }
+    }
+  ],
+  "save_path": "/root/autodl-tmp/0408Yambda/artifacts/models/hpn_warmstart.pt"
+}

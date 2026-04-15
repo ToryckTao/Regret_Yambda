@@ -1,0 +1,32 @@
+{
+  "multi_event_parquet": "/root/autodl-tmp/0408Yambda/../0330Yambda/data/sequential-50m/multi_event.parquet",
+  "orig2dense_npy": "artifacts/mappings/yambda_orig2dense_item_id.npy",
+  "history_len": 50,
+  "close_gap_seconds": 3600,
+  "anchor_policy": "first_visible",
+  "positive_play_threshold": 0.8,
+  "reward_weights": {
+    "play": 1.0,
+    "like": 1.0,
+    "dislike": 1.0,
+    "unlike": 0.0,
+    "undislike": 0.0
+  },
+  "run_stats": {
+    "users_processed": 10000,
+    "total_raw_events": 23898321,
+    "total_kept_events": 23100324,
+    "total_missing_mapping": 1570553,
+    "split_counts": {
+      "train": 41513562,
+      "val": 10000,
+      "test": 10000
+    },
+    "sequence_id_max": 41523676
+  },
+  "outputs": {
+    "train_tsv": "artifacts/processed/train.tsv",
+    "val_tsv": "artifacts/processed/val.tsv",
+    "test_tsv": "artifacts/processed/test.tsv"
+  }
+}
