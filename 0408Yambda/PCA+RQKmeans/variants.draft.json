@@ -1,0 +1,72 @@
+{
+  "status": "draft_waiting_for_confirmation",
+  "shared": {
+    "embedding_column": "normalized_embed",
+    "n_levels": 4,
+    "codebook_size": 256,
+    "seed": 42,
+    "fit_sample_size": 200000,
+    "eval_sample_size": 100000,
+    "full_catalog_eval": true,
+    "rqkmeans_impl": "TO_CONFIRM: balanced_hsrl_compatible_or_scalable",
+    "pca_fit_mode": "TO_CONFIRM: sample_pca_or_incremental_pca",
+    "embeddings_parquet": "",
+    "rqvae_checkpoint": ""
+  },
+  "variants": [
+    {
+      "name": "raw_rqkmeans",
+      "type": "rqkmeans",
+      "pca_dim": null,
+      "whiten": false,
+      "reference": "../01_build_codebook.py and ../02_build_item_sid.py"
+    },
+    {
+      "name": "pca32_rqkmeans",
+      "type": "pca_rqkmeans",
+      "pca_dim": 32,
+      "whiten": false
+    },
+    {
+      "name": "pca64_rqkmeans",
+      "type": "pca_rqkmeans",
+      "pca_dim": 64,
+      "whiten": false
+    },
+    {
+      "name": "pca96_rqkmeans",
+      "type": "pca_rqkmeans",
+      "pca_dim": 96,
+      "whiten": false
+    },
+    {
+      "name": "pca64_whiten_rqkmeans",
+      "type": "pca_rqkmeans",
+      "pca_dim": 64,
+      "whiten": true
+    },
+    {
+      "name": "rqvae",
+      "type": "rqvae",
+      "pca_dim": null,
+      "whiten": false,
+      "reference": "../RQVAE, ../02_build_item_sid.py"
+    }
+  ],
+  "primary_metrics": [
+    "full_sid_collision_rate",
+    "embedding_nn_same_l1_share",
+    "embedding_nn_same_l1_l2_share",
+    "embedding_nn_mean_sid_hamming",
+    "reconstruction_mse_original",
+    "reconstruction_cosine_error_original",
+    "per_level_utilization_avg",
+    "per_level_entropy_ratio_avg"
+  ],
+  "secondary_metrics": [
+    "prefix_collision_rate_by_depth",
+    "max_bucket_share_by_level",
+    "gini_by_level",
+    "prefix_bucket_neighbor_recall"
+  ]
+}

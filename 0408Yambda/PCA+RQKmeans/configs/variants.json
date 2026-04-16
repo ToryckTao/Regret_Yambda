@@ -1,0 +1,54 @@
+{
+  "shared": {
+    "embedding_column": "normalized_embed",
+    "n_levels": 4,
+    "codebook_size": 256,
+    "seed": 42,
+    "kmeans_backend": "faiss.Kmeans",
+    "metrics": [
+      "per_level_utilization",
+      "per_level_entropy",
+      "full_sid_collision",
+      "prefix_collision",
+      "reconstruction_mse",
+      "original_space_cosine_error",
+      "sampled_embedding_nn_sid_locality"
+    ]
+  },
+  "variants": [
+    {
+      "name": "rawRQKmeans",
+      "script": "rawRQKmeans/run_raw_rqkmeans.py"
+    },
+    {
+      "name": "pca32_nowhiten",
+      "script": "PCA_RQKmeans/run_pca_rqkmeans.py",
+      "pca_dim": 32,
+      "whiten": false
+    },
+    {
+      "name": "pca64_nowhiten",
+      "script": "PCA_RQKmeans/run_pca_rqkmeans.py",
+      "pca_dim": 64,
+      "whiten": false
+    },
+    {
+      "name": "pca96_nowhiten",
+      "script": "PCA_RQKmeans/run_pca_rqkmeans.py",
+      "pca_dim": 96,
+      "whiten": false
+    },
+    {
+      "name": "pca64_whiten",
+      "script": "PCA_RQKmeans/run_pca_rqkmeans.py",
+      "pca_dim": 64,
+      "whiten": true
+    },
+    {
+      "name": "RQVAE",
+      "script": "RQVAE/run_rqvae_diagnostics.py",
+      "requires": "rqvae checkpoint"
+    }
+  ]
+}
+
