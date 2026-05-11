@@ -1,0 +1,43 @@
+{
+  "paths": {
+    "representation_dir": "../Repersentation",
+    "embeddings_parquet": "../0330Yambda/data/embeddings.parquet",
+    "multi_event_parquet": "../0330Yambda/data/sequential-50m/multi_event.parquet",
+    "artifacts_dir": "artifacts"
+  },
+  "sid": {
+    "variant": "raw_rqkmeans",
+    "compare_variants": ["raw_rqkmeans", "rqvae", "pca64_nowhiten"]
+  },
+  "split": {
+    "history_len": 50,
+    "close_gap_seconds": 3600,
+    "anchor_policy": "first_visible",
+    "shard_rows": 200000
+  },
+  "reward": {
+    "play": 1.0,
+    "like": 1.0,
+    "dislike": 1.0,
+    "unlike": 1.5,
+    "undislike": 0.5,
+    "clip_min": -1.0,
+    "clip_max": 2.0,
+    "positive_play_threshold": 0.8,
+    "low_play_regret_threshold": 0.2
+  },
+  "user_response": {
+    "hidden_dim": 128,
+    "dropout": 0.1,
+    "batch_size": 256,
+    "epochs": 5,
+    "lr": 0.001
+  },
+  "a2c": {
+    "enabled_later": true,
+    "rollout_steps": 10,
+    "gamma": 0.9,
+    "entropy_coef": 0.01,
+    "value_coef": 0.5
+  }
+}
